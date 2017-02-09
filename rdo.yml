@@ -67,5 +67,4 @@
       src: answers.cfg
       dest: /root/answers.cfg
 
-  - name: Run Packstack
-    shell: packstack --answer-file=/root/answers.cfg
+  - debug: msg="Now you can run: packstack --answer-file=/root/answers.cfg"
