@@ -1,0 +1,71 @@
+---
+
+- hosts: all
+
+  become: true
+  become_user: root
+  become_method: sudo
+
+  vars:
+    apt_cacher_ng: '{{ lookup("env", "APT_CACHER_NG") }}'
+
+  tasks:
+  - setup:
+  - name: Set root password to "password"
+    user:
+      name: root
+      password: '$6$rounds=656000$TiqsBZHF6kt3H1Qs$961/MbRzoVKmk3rJ9SZ9IcTqbsJB499v0.tNHwIYeA6OKLHwsVGN8Mzg2B52ar.p7ukaewIstDP3y35F8FNuS1'
+
+  - name: Authorize your key for root and vagrant
+    authorized_key:
+      user: '{{ item }}'
+      key: '{{ lookup("file", lookup("env","HOME") + "/.ssh/id_rsa.pub") }}'
+    with_items: ['root', 'vagrant']
+
+  - name: Add apt-cacher-ng configuration
+    lineinfile:
+      src: /etc/yum.conf
+      dest: /etc/yum.conf
+      line: proxy=http://{{ apt_cacher_ng }}
+    when: apt_cacher_ng|length
+
+  - debug: var=hostvars[inventory_hostname]
+
+- hosts: controllers
+
+  become: true
+  become_user: root
+  become_method: sudo
+
+  tasks:
+  - name: Add EPEL repo
+    yum_repository:
+      name: epel
+      description: EPEL yum repo
+      mirrorlist: https://mirrors.fedoraproject.org/metalink?repo=testing-epel7&arch=$basearch
+      gpgkey: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-7
+
+  - name: Add OpenStack yum repo
+    yum_repository:
+      name: openstack
+      description: OpenStack yum repo
+      baseurl: https://repos.fedorapeople.org/repos/openstack/EOL/openstack-juno/epel-7/
+      gpgkey: https://raw.githubusercontent.com/puppetlabs/puppetlabs-openstack/master/files/RPM-GPG-KEY-RDO-Juno
+
+  - name: yum update
+    yum:
+      name: '*'
+      state: latest
+
+  - name: yum install openstack-packstack
+    yum:
+      name: openstack-packstack
+      state: latest
+
+  - name: Install answers file
+    template:
+      src: answers.cfg
+      dest: /root/answers.cfg
+
+  - name: Run Packstack
+    shell: packstack --answer-file=/root/answers.cfg
